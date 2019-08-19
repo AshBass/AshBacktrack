@@ -9,7 +9,7 @@
 #import <mach/thread_act.h>
 #import <mach/mach_init.h>
 
-@interface AshBacktrackInfo : NSObject
+@interface AshBacktrackOCInfo : NSObject
 
 @property (nonatomic, assign) NSUInteger threadId;
 @property (nonatomic, copy) NSArray *methodNames;
@@ -17,11 +17,11 @@
 
 @end
 
-@interface AshBacktrack : NSObject
+@interface AshBacktrackOC : NSObject
 
 +(NSString*)machoImageWithAddress:(uintptr_t)address;
-+(AshBacktrackInfo*)threadBacktrackOnlyMainThreadWithFrameMaxCount:(NSUInteger)frameMaxCount;
-+(AshBacktrackInfo*)getThreadBacktrackInfoWithFrameMaxCount:(NSUInteger)frameMaxCount thread:(thread_act_t)threadAct;
-+(NSArray<AshBacktrackInfo*>*)threadBacktrackWithFrameMaxCount:(NSUInteger)frameMaxCount;
++(AshBacktrackOCInfo*)threadBacktrackOnlyMainThreadWithFrameMaxCount:(NSUInteger)frameMaxCount;
++(AshBacktrackOCInfo*)getThreadBacktrackInfoWithFrameMaxCount:(NSUInteger)frameMaxCount thread:(thread_act_t)threadAct;
++(NSArray<AshBacktrackOCInfo*>*)threadBacktrackWithFrameMaxCount:(NSUInteger)frameMaxCount;
 
 @end

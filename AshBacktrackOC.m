@@ -5,7 +5,7 @@
 //  Copyright © 2019年 Harry Houdini. All rights reserved.
 //
 
-#import "AshBacktrack.h"
+#import "AshBacktrackOC.h"
 
 #import <mach/task.h>
 #import <mach/vm_map.h>
@@ -51,17 +51,17 @@ typedef struct StackFrame{
 
 static mach_port_t mainThread;
 
-@implementation AshBacktrack
+@implementation AshBacktrackOC
 
 +(void)load {
     mainThread = mach_thread_self();
 }
 
-+(AshBacktrackInfo*)threadBacktrackOnlyMainThreadWithFrameMaxCount:(NSUInteger)frameMaxCount {
++(AshBacktrackOCInfo*)threadBacktrackOnlyMainThreadWithFrameMaxCount:(NSUInteger)frameMaxCount {
     return [self getThreadBacktrackInfoWithFrameMaxCount:frameMaxCount thread:mainThread];
 }
 
-+(NSArray<AshBacktrackInfo*>*)threadBacktrackWithFrameMaxCount:(NSUInteger)frameMaxCount {
++(NSArray<AshBacktrackOCInfo*>*)threadBacktrackWithFrameMaxCount:(NSUInteger)frameMaxCount {
     NSMutableArray *array = [NSMutableArray new];
     
     thread_act_array_t threadList;
@@ -70,16 +70,16 @@ static mach_port_t mainThread;
     
     for (int i = 0; i < listCount; ++i) {
         thread_act_t threadAct = threadList[i];
-        AshBacktrackInfo *info = [self getThreadBacktrackInfoWithFrameMaxCount:frameMaxCount thread:threadAct];
+        AshBacktrackOCInfo *info = [self getThreadBacktrackInfoWithFrameMaxCount:frameMaxCount thread:threadAct];
         [array addObject:info];
     }
     
     return array.copy;
 }
 
-+(AshBacktrackInfo*)getThreadBacktrackInfoWithFrameMaxCount:(NSUInteger)frameMaxCount thread:(thread_act_t)threadAct {
++(AshBacktrackOCInfo*)getThreadBacktrackInfoWithFrameMaxCount:(NSUInteger)frameMaxCount thread:(thread_act_t)threadAct {
     
-    AshBacktrackInfo *info = [AshBacktrackInfo new];
+    AshBacktrackOCInfo *info = [AshBacktrackOCInfo new];
     
     thread_info_data_t theThreadInfo;
     thread_identifier_info_t identifierInfo = NULL;
@@ -104,28 +104,28 @@ static mach_port_t mainThread;
     uintptr_t buffer[frameMaxCount];
     
     _STRUCT_MCONTEXT machineContext; //线程栈里所有的栈指针
-    mach_msg_type_number_t stateCount = threadStateCount();
-    kern_return_t result = thread_get_state(thread_act, threadState(), (thread_state_t)&machineContext.__ss, &stateCount);
+    mach_msg_type_number_t stateCount = [self threadStateCount];
+    kern_return_t result = thread_get_state(thread_act, [self threadState], (thread_state_t)&machineContext.__ss, &stateCount);
     if (result != KERN_SUCCESS) {
         return @[];
     }
     
     // 获取当前指令地址
-    uintptr_t instructionPointer = machInstructionPointer(&machineContext);
+    uintptr_t instructionPointer = [self machInstructionPointerWithContext:&machineContext];
     if (instructionPointer == 0) {
         return @[];
     }
     buffer[frameCount] = instructionPointer;
     ++frameCount;
     
-    uintptr_t linkRegisterPointer = machThreadGetLinkRegisterPointer(&machineContext);
+    uintptr_t linkRegisterPointer = [self machThreadGetLinkRegisterPointerWithContext:&machineContext];
     if (linkRegisterPointer) {
         buffer[frameCount] = linkRegisterPointer;
         ++frameCount;
     }
     
     // 获取栈基地址
-    uintptr_t stackBasePointer = machStackBasePointer(&machineContext);
+    uintptr_t stackBasePointer = [self machStackBasePointerWithContext:&machineContext];
     if (stackBasePointer == 0) {
         return @[];
     }
@@ -255,7 +255,7 @@ static mach_port_t mainThread;
  栈帧指针
  _STRUCT_MCONTEXT->__ss.LSL_FRAME_POINTER  //rbp 栈帧指针
  */
-uintptr_t machStackBasePointer(mcontext_t const machineContext) {
++(uintptr_t)machStackBasePointerWithContext:(mcontext_t const)machineContext {
     //Stack base pointer for holding the address of the current stack frame.
 #if defined(__arm64__)
     return machineContext->__ss.__fp;
@@ -271,7 +271,7 @@ uintptr_t machStackBasePointer(mcontext_t const machineContext) {
 /*
  _STRUCT_MCONTEXT->__ss.LSL_INSTRUCTION_ADDRESS //rip 指令指针
  */
-uintptr_t machInstructionPointer(mcontext_t const machineContext) {
++(uintptr_t)machInstructionPointerWithContext:(mcontext_t const)machineContext {
     //Instruction pointer. Holds the program counter, the current instruction address.
 #if defined(__arm64__)
     return machineContext->__ss.__pc;
@@ -284,7 +284,7 @@ uintptr_t machInstructionPointer(mcontext_t const machineContext) {
 #endif
 }
 
-uintptr_t instructionAddress(const uintptr_t address) {
++(uintptr_t)instructionAddress:(const uintptr_t)address {
 #if defined(__arm64__)
     const uintptr_t reAddress = ((address) & ~(3UL));
 #elif defined(__arm__)
@@ -297,7 +297,7 @@ uintptr_t instructionAddress(const uintptr_t address) {
     return reAddress - 1;
 }
 
-mach_msg_type_number_t threadStateCount() {
++(mach_msg_type_number_t)threadStateCount {
 #if defined(__arm64__)
     return ARM_THREAD_STATE64_COUNT;
 #elif defined(__arm__)
@@ -309,7 +309,7 @@ mach_msg_type_number_t threadStateCount() {
 #endif
 }
 
-thread_state_flavor_t threadState() {
++(thread_state_flavor_t)threadState {
 #if defined(__arm64__)
     return ARM_THREAD_STATE64;
 #elif defined(__arm__)
@@ -321,7 +321,7 @@ thread_state_flavor_t threadState() {
 #endif
 }
 
-uintptr_t machThreadGetLinkRegisterPointer(mcontext_t const machineContext) {
++(uintptr_t)machThreadGetLinkRegisterPointerWithContext:(mcontext_t const)machineContext {
 #if defined(__i386__)
     return 0;
 #elif defined(__x86_64__)
@@ -333,7 +333,7 @@ uintptr_t machThreadGetLinkRegisterPointer(mcontext_t const machineContext) {
 
 @end
 
-@implementation AshBacktrackInfo
+@implementation AshBacktrackOCInfo
 
 
 @end
